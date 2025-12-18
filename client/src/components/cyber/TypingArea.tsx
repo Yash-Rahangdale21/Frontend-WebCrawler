@@ -1,65 +1,45 @@
-import { useState, useRef, useEffect } from "react";
-import { ArrowUp } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Send, Terminal } from "lucide-react";
+import { useState } from "react";
 
 interface TypingAreaProps {
   onSend: (text: string) => void;
-  isTyping: boolean;
+  isLoading?: boolean;
 }
 
-export default function TypingArea({ onSend, isTyping }: TypingAreaProps) {
-  const [input, setInput] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+export const TypingArea = ({ onSend, isLoading }: TypingAreaProps) => {
+  const [inputValue, setInputValue] = useState("");
 
-  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
-    if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const handleSend = () => {
-    if (!input.trim() || isTyping) return;
-    onSend(input);
-    setInput("");
-    if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
+  const handleAction = () => {
+    if (inputValue.trim() && !isLoading) {
+      onSend(inputValue);
+      setInputValue("");
     }
   };
 
   return (
-    <div className="flex-shrink-0 p-6 bg-gradient-to-t from-cyber-bg via-cyber-bg to-transparent">
-      <div className="relative max-w-4xl mx-auto bg-cyber-surface border border-[rgba(0,240,255,0.2)] backdrop-blur-md rounded-[1.25rem] p-2 flex items-end gap-2 min-h-[80px] shadow-[0_0_20px_rgba(0,0,0,0.3)]">
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={handleInput}
-          onKeyDown={handleKeyDown}
-          placeholder="Enter command..."
-          rows={1}
-          className="flex-grow bg-transparent border-none outline-none resize-none text-cyber-text text-base p-3 max-h-[200px] font-body placeholder:text-gray-600 focus:ring-0"
+    <div className="relative group p-2">
+      <div className="relative flex items-center">
+        <div className="absolute left-4 text-cyber-secondary/50">
+          <Terminal size={18} />
+        </div>
+        
+        <input 
+          type="text" 
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="ENTER NEURAL COMMAND..."
+          className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-16 focus:outline-none focus:border-cyber-secondary/50 focus:ring-1 focus:ring-cyber-secondary/50 transition-all text-cyan-50 placeholder:text-slate-600 tracking-wider"
+          onKeyDown={(e) => e.key === 'Enter' && handleAction()}
         />
-        <button
-          onClick={handleSend}
-          disabled={!input.trim() || isTyping}
-          className={cn(
-            "p-2 rounded-full transition-all duration-300 ease-out flex-shrink-0 mb-1",
-            input.trim() && !isTyping
-              ? "bg-cyber-primary text-cyber-bg scale-100 opacity-100 rotate-0 shadow-[0_0_10px_var(--cyber-primary)] hover:scale-110"
-              : "bg-transparent text-gray-500 scale-75 opacity-0 rotate-45"
-          )}
+        
+        <button 
+          onClick={handleAction}
+          disabled={isLoading || !inputValue.trim()}
+          className="absolute right-2 p-3 bg-cyber-secondary hover:bg-cyan-400 text-black rounded-lg transition-all shadow-lg shadow-cyan-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <ArrowUp className="w-6 h-6" />
+          <Send size={18} />
         </button>
       </div>
     </div>
   );
-}
+};
