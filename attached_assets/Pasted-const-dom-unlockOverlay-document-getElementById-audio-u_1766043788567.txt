@@ -1,0 +1,336 @@
+const dom = {
+    unlockOverlay: document.getElementById("audio-unlock-overlay"),
+    unlockBtn: document.getElementById("unlock-button"),
+    mainLayout: document.querySelector(".main-layout"),
+    chatList: document.querySelector(".chat-list"),
+    typingTextarea: document.getElementById("typing-textarea"),
+    sendBtn: document.getElementById("send-btn"),
+    codeModal: document.getElementById("code-modal-overlay"),
+    header: document.querySelector('.header'),
+    aboutBtn: document.getElementById("about-btn"),
+    aboutModalOverlay: document.getElementById("about-modal-overlay"),
+    aboutModalCloseBtn: document.getElementById("about-modal-close-btn")
+};
+
+const audio = {
+    boot: document.getElementById("audio-boot"),
+    send: document.getElementById("audio-send"),
+    click: document.getElementById("audio-click")
+};
+
+const responses = {
+    "کد CSS": "این یک نمونه کد CSS برای انیمیشن است:\n```css\n@keyframes example-anim {\n  from { opacity: 0; }\n  to { opacity: 1; }\n}\n.element {\n  animation: example-anim 1s ease-in-out;\n}\n```",
+    "کد JS": "درخواست کد: Summation\n```javascript\n// A simple function to sum array elements\nconst sumArray = (arr) => {\n  return arr.reduce((total, current) => total + current, 0);\n}\nconsole.log(sumArray([10, 20, 30]));\n```",
+};
+
+let isTyping = false;
+let codeMirrorInstance = null;
+
+
+// ==================================================
+// 2. تعریف توابع اصلی (Core Functions)
+// ==================================================
+
+// --- تابع پخش صدا ---
+function playSound() {
+    audio.click.currentTime = 0;
+    audio.click.play().catch(e => {});
+}
+
+// --- توابع مربوط به چت ---
+function createMessage(content, type) {
+    const bubbleWrapper = document.createElement('div');
+    bubbleWrapper.className = `chat-bubble ${type}`;
+    const bubbleContent = document.createElement('div');
+    bubbleContent.className = 'chat-bubble-content';
+    const parts = content.split(/```(\w+)?\n([\s\S]*?)```/g);
+    parts.forEach((part, index) => {
+        if (index % 3 === 2) {
+            const lang = parts[index - 1] || 'javascript';
+            const code = part.trim();
+            const btn = document.createElement('button');
+            btn.className = 'view-code-btn';
+            btn.innerHTML = `<span class="material-symbols-rounded">code</span> VIEW SOURCE`;
+            btn.dataset.code = code;
+            btn.dataset.lang = lang;
+            bubbleContent.appendChild(btn);
+        } else if (part.trim()) {
+            const p = document.createElement('p');
+            p.textContent = part.trim();
+            bubbleContent.appendChild(p);
+        }
+    });
+    bubbleWrapper.appendChild(bubbleContent);
+    dom.chatList.appendChild(bubbleWrapper);
+    return bubbleWrapper;
+}
+
+function handleSend() {
+    const message = dom.typingTextarea.value.trim();
+    if (!message || isTyping) return;
+    isTyping = true;
+    audio.send.play().catch(e => {});
+    dom.typingTextarea.value = "";
+    autoResizeTextarea();
+    dom.sendBtn.classList.remove('visible');
+    if (dom.header.style.display !== 'none') {
+        gsap.to(dom.header, {
+            opacity: 0,
+            height: 0,
+            duration: 0.4,
+            onComplete: () => dom.header.style.display = 'none'
+        });
+    }
+    const userMsgEl = createMessage(message, 'user');
+    gsap.from(userMsgEl, {
+        opacity: 0,
+        scale: 0.8,
+        y: 10,
+        duration: 0.4,
+        ease: "power2.out"
+    });
+    scrollToBottom();
+    setTimeout(() => showBotResponse(message), 800);
+}
+
+function showBotResponse(userMsg) {
+    const loadingEl = createMessage(`...`, 'bot');
+    gsap.from(loadingEl, {
+        opacity: 0,
+        scale: 0.8,
+        y: 10,
+        duration: 0.4,
+        ease: "power2.out"
+    });
+    scrollToBottom();
+    setTimeout(() => {
+        loadingEl.remove();
+        const key = Object.keys(responses).find(k => userMsg.toLowerCase().includes(k.split(' ')[1].toLowerCase())) || "کد JS";
+        const botMsgEl = createMessage(responses[key], 'bot');
+        gsap.from(botMsgEl, {
+            opacity: 0,
+            scale: 0.9,
+            y: 10,
+            duration: 0.4,
+            ease: "power2.out"
+        });
+        isTyping = false;
+        scrollToBottom();
+    }, 1500);
+}
+
+function resetChat() {
+    // playSound(); // این مورد به درخواست خودت غیرفعال باقی ماند
+    gsap.to(dom.chatList, {
+        opacity: 0,
+        duration: 0.4,
+        onComplete: () => {
+            const children = Array.from(dom.chatList.children);
+            children.forEach(child => {
+                if (!child.classList.contains('header')) child.remove();
+            });
+            if (dom.header.style.display === 'none') {
+                dom.header.style.display = 'block';
+                gsap.to(dom.header, {
+                    opacity: 1,
+                    height: 'auto',
+                    duration: 0.4
+                });
+            }
+            dom.chatList.style.opacity = 1;
+        }
+    });
+}
+
+// --- توابع مربوط به مودال کد ---
+function openCodeModal(code, lang) {
+    const modalContent = `<div class="code-container"><div class="glow-container"><div class="augs" data-augmented-ui></div></div><section class="augs bg" data-augmented-ui><button class="dots" id="modal-close-btn"></button><div class="code-title">${lang.toUpperCase()}</div><div class="code"><textarea>${code}</textarea></div></section></div>`;
+    dom.codeModal.innerHTML = modalContent;
+    dom.codeModal.style.display = 'flex';
+    gsap.from(dom.codeModal.querySelector('.code-container'), {
+        scale: 0.8,
+        opacity: 0,
+        duration: 0.4,
+        ease: "power2.out"
+    });
+    codeMirrorInstance = CodeMirror.fromTextArea(dom.codeModal.querySelector('textarea'), {
+        lineNumbers: true,
+        matchBrackets: true,
+        scrollbarStyle: "simple",
+        readOnly: true,
+        mode: lang,
+        theme: 'highcontrast-dark'
+    });
+    setTimeout(() => codeMirrorInstance.refresh(), 100);
+    document.getElementById('modal-close-btn').addEventListener('click', closeCodeModal);
+}
+
+function closeCodeModal() {
+    gsap.to(dom.codeModal.querySelector('.code-container'), {
+        scale: 0.8,
+        opacity: 0,
+        duration: 0.3,
+        ease: "power2.in",
+        onComplete: () => {
+            dom.codeModal.style.display = 'none';
+            dom.codeModal.innerHTML = '';
+            codeMirrorInstance = null;
+        }
+    });
+}
+
+// --- توابع مربوط به مودال "درباره پروژه" ---
+// --- Functions for About Modal ---
+function openInfoModal() {
+    // playSound();  // این خط حذف یا کامنت شد
+    dom.aboutModalOverlay.style.display = 'flex';
+    gsap.from(dom.aboutModalOverlay.querySelector('.about-modal-container'), {
+        scale: 0.8,
+        opacity: 0,
+        duration: 0.4,
+        ease: "power2.out"
+    });
+}
+
+function closeInfoModal() {
+    gsap.to(dom.aboutModalOverlay.querySelector('.about-modal-container'), {
+        scale: 0.8,
+        opacity: 0,
+        duration: 0.3,
+        ease: "power2.in",
+        onComplete: () => {
+            dom.aboutModalOverlay.style.display = 'none';
+            
+            //  این خط جدید مشکل را حل می‌کند
+            // پاپ‌آپ را به حالت اولیه برمی‌گرداند تا برای باز شدن بعدی آماده باشد
+            gsap.set(dom.aboutModalOverlay.querySelector('.about-modal-container'), { opacity: 1, scale: 1 });
+        }
+    });
+}
+
+// --- توابع کمکی ---
+function scrollToBottom() {
+    gsap.to(dom.chatList.parentElement, {
+        scrollTop: dom.chatList.parentElement.scrollHeight,
+        duration: 0.4,
+        ease: "power2.out"
+    });
+}
+
+function autoResizeTextarea() {
+    const textarea = dom.typingTextarea;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+function initParticles() {
+    particlesJS("particles-js", {
+        particles: {
+            number: {
+                value: 60,
+            },
+            color: {
+                value: "#00f0ff"
+            },
+            opacity: {
+                value: 0.4,
+                random: true
+            },
+            size: {
+                value: 1.5,
+                random: true
+            },
+            line_linked: {
+                enable: true,
+                distance: 150,
+                color: "#a800ff",
+                opacity: 0.1
+            },
+            move: {
+                enable: true,
+                speed: 1,
+                out_mode: "out"
+            }
+        },
+        interactivity: {
+            events: {
+                onhover: {
+                    enable: true,
+                    mode: "grab"
+                }
+            }
+        }
+    });
+}
+
+
+// ==================================================
+// 3. اجرای اولیه و اتصال رویدادها (Initialization & Event Listeners)
+// ==================================================
+
+// --- رویدادهای اصلی صفحه ---
+dom.unlockBtn.addEventListener('click', () => {
+    playSound(); // پخش صدا فقط در شروع
+    audio.boot.play().catch(e => {});
+    gsap.to(dom.unlockOverlay, {
+        opacity: 0,
+        duration: 0.5,
+        onComplete: () => {
+            dom.unlockOverlay.style.display = 'none';
+            gsap.to(dom.mainLayout, {
+                opacity: 1,
+                duration: 0.5
+            });
+            initParticles();
+        }
+    });
+});
+
+dom.sendBtn.addEventListener('click', handleSend);
+
+dom.typingTextarea.addEventListener('input', () => {
+    autoResizeTextarea();
+    if (dom.typingTextarea.value.trim().length > 0) {
+        dom.sendBtn.classList.add('visible');
+    } else {
+        dom.sendBtn.classList.remove('visible');
+    }
+});
+
+dom.typingTextarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+    }
+});
+
+// --- رویدادهای مربوط به کلیک‌ها در بخش‌های مختلف ---
+document.querySelector('.sidebar').addEventListener('click', (e) => {
+    if (e.target.closest('button[class*="sidebar-btn"]') && e.target.closest('button').innerText.includes('چت جدید')) {
+        resetChat();
+    }
+});
+
+
+dom.chatList.addEventListener('click', (e) => {
+    const btn = e.target.closest('.view-code-btn');
+    if (btn) {
+        // playSound(); // این مورد هم به درخواست خودت غیرفعال باقی ماند
+        openCodeModal(btn.dataset.code, btn.dataset.lang);
+    }
+});
+
+dom.codeModal.addEventListener('click', (e) => {
+    if (e.target === dom.codeModal) {
+        closeCodeModal();
+    }
+});
+
+// --- رویدادهای مودال "درباره پروژه" ---
+dom.aboutBtn.addEventListener('click', openInfoModal);
+dom.aboutModalCloseBtn.addEventListener('click', closeInfoModal);
+dom.aboutModalOverlay.addEventListener('click', (e) => {
+    if (e.target === dom.aboutModalOverlay) {
+        closeInfoModal();
+    }
+});
