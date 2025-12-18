@@ -36,12 +36,13 @@ export default function UnlockScreen({ onUnlock }: UnlockScreenProps) {
             onClick={handleUnlock}
             className="font-display text-2xl px-8 py-4 border-2 border-cyber-primary text-cyber-primary bg-transparent cursor-pointer transition-colors duration-300 text-shadow-primary tracking-widest uppercase"
           >
-            Enter Interface
+            Enter the Spex
           </motion.button>
           
-          <p className="mt-6 text-sm text-gray-500 font-body tracking-wider animate-pulse">
-            Click to initialize neural link
-          </p>
+          {/* <p className="mt-6 text-sm text-gray-500 font-body tracking-wider animate-pulse">
+            Automated Website-to-RAG AI Chatbot Generator
+
+          </p> */}
         </motion.div>
       )}
     </AnimatePresence>
